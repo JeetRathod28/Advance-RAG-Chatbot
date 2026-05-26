@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  rag-chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rag-chatbot:latest
+    container_name: rag-chatbot
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - FAISS_INDEX_PATH=/app/vector_store
+      - DATA_PATH=/app/data
+      - CORS_ORIGINS=http://localhost:8000
+    volumes:
+      - ./vector_store:/app/vector_store
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  vector_store:
+  data:
+  logs:
