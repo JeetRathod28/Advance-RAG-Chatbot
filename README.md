@@ -15,11 +15,11 @@ Router Decision (LLM)
     ├── both        → Hybrid + Web
     └── direct      → LLM direct answer
     │
-Reranking (BGE-reranker-large)  top-20 → top-5
+Reranking (cross-encoder/ms-marco-MiniLM-L-6-v2)  top-30 → top-8
     │
 Context Compression
     │
-Answer Generation (Groq llama-3.3-70b-versatile)  ← streamed
+Answer Generation (Ollama llama3.1:8b)  ← streamed
     │
 Validation → Memory Update → SSE Response
 ```
@@ -28,14 +28,14 @@ Validation → Memory Update → SSE Response
 
 | Layer | Technology |
 |---|---|
-| LLM | Groq (`llama-3.3-70b-versatile`) |
-| Embeddings | `BAAI/bge-large-en-v1.5` (1024-dim) |
-| Reranker | `BAAI/bge-reranker-large` |
+| LLM | Ollama (`llama3.1:8b` / local) |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | Vector Store | FAISS (cosine similarity) |
 | Sparse Search | BM25 (rank-bm25) |
 | Fusion | Reciprocal Rank Fusion (RRF k=60) |
 | Web Search | Tavily API |
-| Agent | LangGraph `StateGraph` |
+| Orchestration | Functional streaming agent (with legacy node compatibility) |
 | Backend | FastAPI + SSE streaming |
 | Frontend | React 18 + Vite + Tailwind CSS |
 
@@ -45,7 +45,7 @@ Validation → Memory Update → SSE Response
 
 - Python 3.11+
 - Node.js 20+
-- Groq API key — [console.groq.com](https://console.groq.com)
+- Ollama running locally (with model `llama3.1:8b` pulled: `ollama pull llama3.1:8b`)
 - Tavily API key — [app.tavily.com](https://app.tavily.com)
 
 ### 2. Clone and configure
@@ -53,7 +53,7 @@ Validation → Memory Update → SSE Response
 ```bash
 cd "RAG chatbot"
 cp .env.example .env
-# Edit .env and add your API keys
+# Edit .env and add your Tavily API key
 ```
 
 ### 3. Backend
@@ -88,7 +88,7 @@ Open `http://localhost:5173`
 
 ```bash
 cp .env.example .env
-# Add API keys to .env
+# Add Tavily API key to .env
 
 docker-compose up --build
 ```
@@ -142,9 +142,9 @@ Lists all indexed documents.
 
 ```
 ├── app/
-│   ├── agents/          # LangGraph stateful agent
+│   ├── agents/          # Agent routing & stream pipeline
 │   ├── retrieval/       # Dense (FAISS), sparse (BM25), hybrid (RRF)
-│   ├── rerank/          # BGE cross-encoder reranker
+│   ├── rerank/          # ms-marco cross-encoder reranker
 │   ├── memory/          # Per-session conversation memory
 │   ├── ingestion/       # Document loader + chunker + pipeline
 │   ├── prompts/         # All prompt templates
@@ -154,6 +154,7 @@ Lists all indexed documents.
 │   ├── models/          # Request/response schemas
 │   ├── services/        # Embedding, LLM, compression services
 │   └── utils/           # Logger, helpers
+│   └── nodes.py         # Legacy agent nodes
 ├── frontend/            # React + Vite + Tailwind
 ├── vector_store/        # FAISS index (auto-created)
 ├── data/                # Uploaded documents
@@ -163,10 +164,9 @@ Lists all indexed documents.
 
 ## Performance Notes
 
-- First startup downloads embedding model (~1.5 GB) and reranker (~1 GB) from HuggingFace
+- First startup downloads embedding model (~90 MB) and reranker (~80 MB) from HuggingFace
 - Models are cached in `~/.cache/huggingface/` after first download
-- Use `--workers 1` with LangGraph (stateful graph is not multi-process safe)
-- For high traffic, use async FAISS + multiple Gunicorn processes with Redis checkpointer
+- Run locally with Ollama (ensure it is running on background: `ollama serve`)
 
 ## Security
 
@@ -174,3 +174,4 @@ Lists all indexed documents.
 - File uploads are validated by extension and size
 - CORS is restricted to configured origins
 - No database SQL surface — FAISS is file-based
+
